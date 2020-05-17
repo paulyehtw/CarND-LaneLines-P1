@@ -54,3 +54,183 @@ A browser window will appear showing the contents of the current directory.  Cli
 ## How to write a README
 A well written README file can enhance your project and portfolio.  Develop your abilities to create professional README files by completing [this free course](https://www.udacity.com/course/writing-readmes--ud777).
 
+
+
+# **Writeup for submission** 
+
+---
+
+
+**Finding Lane Lines on the Road**
+
+The goals / steps of this project are the following:
+* Make a pipeline that finds lane lines on the road
+* Reflect on your work in a written report
+
+Environment used : Docker
+
+Installation guide : [CarND-Term1-Starter-Kit](https://github.com/udacity/CarND-Term1-Starter-Kit/blob/master/doc/configure_via_docker.md)
+After installing Docker, clone this repo and in the repo directory run : 
+
+```docker run -it --rm --entrypoint "/run.sh" -p 8888:8888 -v `pwd`:/src udacity/carnd-term1-starter-kit```
+
+Then run `jupyer notebook` with another terminal to launch Jupyter Notebook
+
+---
+
+### Reflection
+
+### 1. Pipeline for finding lines in a image.
+
+First choose image `whiteCarLaneSwitch.jpg` from test images.
+
+```image = mpimg.imread('test_images/whiteCarLaneSwitch.jpg')```
+
+<p align="center">
+  <img  src="test_images/whiteCarLaneSwitch.jpg">
+</p>
+
+1. Turn the image into gray scale:
+
+```gray_image = grayscale(image)```
+
+<p align="center">
+  <img  src="test_images_output/gray_image.png">
+</p>
+
+2. Detect edges with canny() function:
+
+```edge_image = canny(gray_image, low_threshold, high_threshold)```
+
+<p align="center">
+  <img  src="test_images_output/edge_image.png">
+</p>
+
+3. Apply mask to filter out unnecessary lines:
+
+```
+height = image.shape[0]
+width = image.shape[1]
+height_offset = 40
+width_offset = 30
+vertices = np.array([[0, height], 
+                     [width, height], 
+                     [width*1/2 + width_offset, height*1/2 + height_offset], 
+                     [width*1/2 - width_offset, height*1/2 + height_offset]], 
+                     np.int32)
+masked_image = region_of_interest(edge_image, vertices)
+```
+
+<p align="center">
+  <img  src="test_images_output/masked_image.png">
+</p>
+
+4. Use HoughLinesP() and draw_lines() to cluster lines :
+
+```
+rho = 1
+theta = np.pi/180
+threshold = 32
+min_line_length = 10
+max_line_gap = 200
+line_img = hough_lines(masked_image, rho, theta, threshold, min_line_length, max_line_gap)
+```
+
+<p align="center">
+  <img  src="test_images_output/line_img.png">
+</p>
+
+in the `draw_lines()`, firstly check the slope of each line, then add lines into arrays for left and right:
+```
+current_slope = (y2-y1)/(x2-x1)
+intercept = y1 -current_slope*x1
+
+if current_slope < 0.0 and current_slope > -math.inf:
+    negative_slopes.append(current_slope) # left line
+    left_line_x.append(x1)
+    left_line_x.append(x2)
+    left_line_y.append(y1)
+    left_line_y.append(y2)
+    negetive_intercepts.append(intercept)
+
+elif current_slope > 0.0 and current_slope < math.inf:
+    positive_slopes.append(current_slope) # right line
+    right_line_x.append(x1)
+    right_line_x.append(x2)
+    right_line_y.append(y1)
+    right_line_y.append(y2)
+    positive_intercepts.append(intercept)
+```
+
+Then average the lines on each side, then calculate a single line for each side and draw them:
+```
+if len(positive_slopes) > 0 and len(right_line_x) > 0 and len(right_line_y) > 0:
+    avg_positive_slope = sum(positive_slopes) / len(positive_slopes)
+    avg_right_line_x = sum(right_line_x) / len(right_line_x)
+    avg_right_line_y = sum(right_line_y ) / len(right_line_y)
+    avg_intercept = sum(positive_intercepts) / len(positive_intercepts)    
+    x_min=int((y_min-avg_intercept)/avg_positive_slope) 
+    x_max = int((y_max - avg_intercept)/ avg_positive_slope)
+    cv2.line(img, (x_min, y_min), (x_max, y_max), color, 20)
+
+if len(negative_slopes) > 0 and len(left_line_x) > 0 and len(left_line_y) > 0:
+    avg_negative_slope = sum(negative_slopes) / len(negative_slopes)
+    avg_left_line_x = sum(left_line_x) / len(left_line_x)
+    avg_left_line_y = sum(left_line_y ) / len(left_line_y)
+    avg_intercept = sum(negetive_intercepts) / len(negetive_intercepts)
+    x_min = int((y_min-avg_intercept)/avg_negative_slope) 
+    x_max = int((y_max - avg_intercept)/ avg_negative_slope)
+    cv2.line(img, (x_min, y_min), (x_max, y_max), color, 20)
+```
+
+5. Lastly combine the lines with the original image :
+
+```
+weighted_image = weighted_img(image,line_img , α=0.9, β=0.9, γ=0.)
+```
+
+<p align="center">
+  <img  src="test_images_output/weighted_imgage.png">
+</p>
+
+### 2. Apple the pipeline on video.
+
+Put the pipeline into `process_image()` : 
+
+```
+def process_image(image):
+    gray_image = grayscale(image)
+    
+    low_threshold = 85
+    high_threshold = 3 * low_threshold
+    edge_image = canny(gray_image, low_threshold, high_threshold)
+    
+    height = image.shape[0]
+    width = image.shape[1]
+    height_offset = 40
+    width_offset = 30
+    vertices = np.array([[0, height], 
+                     [width, height], 
+                     [width*1/2 + width_offset, height*1/2 + height_offset], 
+                     [width*1/2 - width_offset, height*1/2 + height_offset]], 
+                     np.int32)
+    masked_image = region_of_interest(edge_image, vertices)
+    
+    rho = 1
+    theta = np.pi/180
+    threshold = 32
+    min_line_length = 10
+    max_line_gap = 200
+    line_img = hough_lines(masked_image, rho, theta, threshold, min_line_length, max_line_gap)
+    
+    result = weighted_img(image,line_img , α=0.9, β=0.9, γ=0.)
+
+    return result
+```
+
+Video results please check `test_videos_output/solidWhiteRight.mp4` and `test_videos_output/solidYellowLeft.mp4`
+
+### 3. Suggest possible improvements to your pipeline
+
+More tuning might be needed since the curves of lines vary depending on different scenes.
+
