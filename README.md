@@ -228,7 +228,21 @@ def process_image(image):
     return result
 ```
 
-Video results please check `test_videos_output/solidWhiteRight.mp4` and `test_videos_output/solidYellowLeft.mp4`
+### Video results
+
+**solidWhiteRight.mp4 :**
+
+<p align="left">
+  <img  src="test_videos_output/solidWhiteRight.gif">
+</p>
+
+
+**solidYellowLeft.mp4 :**
+
+<p align="left">
+  <img  src="test_videos_output/solidYellowLeft.gif">
+</p>
+
 
 ### 3. Suggest possible improvements to your pipeline
 
